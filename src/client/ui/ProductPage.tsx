@@ -29,7 +29,7 @@ function OpenPanel({ g }: { g: OpenGame }) {
       <div class="bp-title">회차 선택</div>
       <div class="bp-rounds">{d ? <button class="round sel">1회 {d.time}</button> : <p class="muted">관람일을 먼저 선택하세요.</p>}</div>
       <div class="bp-remain">{d ? '잔여석은 예매하기 이후 확인할 수 있습니다.' : ''}</div>
-      <button class={`btn-book ${loading ? 'loading' : ''}`} onClick={() => void g.clickBook()}>{loading ? '접속 중…' : '예매하기'}</button>
+      <button class="btn-book" disabled={loading} onClick={() => void g.clickBook()}>{loading ? '접속 중…' : '예매하기'}</button>
     </>
   );
 }

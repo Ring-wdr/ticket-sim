@@ -2,16 +2,15 @@
 import type { PayMethod } from '../../shared/model';
 import { fmt } from '../../shared/time';
 import { GRADES, SHOW, type GradeKey } from '../../shared/venue';
-import { STEPS, type BookingFlow } from '../game/bookingFlow';
+import { STEPS, type BookingFlow, type Receive } from '../game/bookingFlow';
 import { Captcha } from './Captcha';
-import { useSession } from './context';
+import { cx } from './cx';
 import { SeatStep } from './SeatStep';
 
 function Timer({ flow }: { flow: BookingFlow }) {
-  void useSession().now.value; // 화면 갱신 주기에 맞춰 다시 그린다
-  const ms = flow.game.timeLeft();
-  if (ms == null) return <div class="pw-timer" hidden />;
-  return <div class={`pw-timer ${ms < 60000 ? 'warn' : ''}`}><span>남은 시간</span><b>{fmt.mmss(ms)}</b></div>;
+  const ms = flow.game.timeLeft.value;
+  if (ms == null) return null;
+  return <div class={cx('pw-timer', ms < 60000 && 'warn')}><span>남은 시간</span><b>{fmt.mmss(ms)}</b></div>;
 }
 
 function Summary({ flow }: { flow: BookingFlow }) {
@@ -63,12 +62,19 @@ function PriceStep({ flow }: { flow: BookingFlow }) {
   );
 }
 
+const RECEIVE: [Receive, string][] = [['mobile', '모바일티켓'], ['onsite', '현장수령']];
+
 function ConfirmStep({ flow }: { flow: BookingFlow }) {
+  const receive = flow.receive.value;
   return (
     <>
       <div class="step-wrap two-col">
         <section class="step-main"><h3 class="st-title">티켓 수령방법</h3>
-          <div class="radio-row"><label><input type="radio" name="rcv" checked /> 모바일티켓</label><label><input type="radio" name="rcv" /> 현장수령</label></div>
+          <div class="radio-row">
+            {RECEIVE.map(([v, label]) => (
+              <label key={v}><input type="radio" name="rcv" value={v} checked={receive === v} onChange={() => { flow.receive.value = v; }} /> {label}</label>
+            ))}
+          </div>
           <h3 class="st-title">예매자 확인</h3>
           <table class="form-tbl"><tbody>
             <tr><th>이름</th><td><input value="김티켓" readOnly /></td></tr>
@@ -98,7 +104,7 @@ function PaymentStep({ flow }: { flow: BookingFlow }) {
         <section class="step-main"><h3 class="st-title">결제수단 선택</h3>
           <div class="pay-methods">
             {PAY_METHODS.map(([v, label]) => (
-              <label key={v}><input type="radio" name="pay" value={v} checked={method === v} onChange={() => { flow.payMethod.value = v; }} /> {label}</label>
+              <label key={v} class={cx(method === v && 'on')}><input type="radio" name="pay" value={v} checked={method === v} onChange={() => { flow.payMethod.value = v; }} /> {label}</label>
             ))}
           </div>
           <p class="pay-note">
@@ -141,7 +147,7 @@ function DoneStep({ flow }: { flow: BookingFlow }) {
         <div><span>좌석</span><b>{flow.seats().map(s => <div key={s.id}>{GRADES[s.grade].name} {s.label}</div>)}</b></div>
         <div><span>결제금액</span><b>{fmt.won(a.total)}</b></div>
         <div><span>DB 저장</span>
-          <b class={`persist ${lag != null ? 'ok' : ''}`}>{lag != null ? `✅ 저장 완료 (MQ 지연 ${fmt.num(lag)}ms)` : '⏳ MQ 대기 중… Worker가 곧 저장합니다'}</b>
+          <b class={cx('persist', lag != null && 'ok')}>{lag != null ? `✅ 저장 완료 (MQ 지연 ${fmt.num(lag)}ms)` : '⏳ MQ 대기 중… Worker가 곧 저장합니다'}</b>
         </div>
       </div>
       <button class="btn-primary" onClick={() => flow.game.finishSuccess()}>결과 보기</button>
@@ -153,7 +159,7 @@ export function BookingWindow({ flow }: { flow: BookingFlow }) {
   const step = flow.step.value;
   const picker = flow.picker.value;
   return (
-    <div class={`popup-backdrop ${flow.game.kind === 'cancel' ? 'with-feed' : ''}`}><div class="popup-win">
+    <div class="popup-backdrop"><div class="popup-win">
       <div class="pw-bar">
         <span class="pw-dots"><i /><i /><i /></span>
         <span class="pw-url">🔒 tickets.tikitaka.example/booking/lumina2026</span>
@@ -166,7 +172,7 @@ export function BookingWindow({ flow }: { flow: BookingFlow }) {
       <ol class="pw-steps">
         {STEPS.map((s, i) => {
           const n = i + 1;
-          return <li key={s} class={`${n === step ? 'on' : ''} ${n < step ? 'done' : ''}`}><em>0{n}</em>{s}</li>;
+          return <li key={s} class={cx(n === step && 'on', n < step && 'done')}><em>0{n}</em>{s}</li>;
         })}
       </ol>
       <div class="pw-body">

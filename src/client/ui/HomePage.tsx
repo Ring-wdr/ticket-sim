@@ -2,6 +2,7 @@ import { useState } from 'preact/hooks';
 import type { DiffKey, ModeKind } from '../../shared/model';
 import { Footer, Header, Poster } from './common';
 import { useSession } from './context';
+import { cx } from './cx';
 
 const DIFFS: Record<ModeKind, [DiffKey, string, string][]> = {
   open: [['easy', '쉬움', '동시접속 2만'], ['normal', '보통', '동시접속 15만'], ['hard', '어려움', '동시접속 100만']],
@@ -19,7 +20,7 @@ function ModeCard({ kind, icon, title, desc, points, meta, cta }: {
       <ul class="mc-points">{points.map(p => <li key={p}>{p}</li>)}</ul>
       <div class="seg">
         {DIFFS[kind].map(([k, label, sub]) => (
-          <label key={k}>
+          <label key={k} class={cx(diff === k && 'on')}>
             <input type="radio" name={`diff-${kind}`} value={k} checked={diff === k} onChange={() => setDiff(k)} />
             <span><b>{label}</b><small>{sub}</small></span>
           </label>

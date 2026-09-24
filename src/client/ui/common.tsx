@@ -4,6 +4,7 @@ import { p2 } from '../../shared/time';
 import { dialog } from '../app/dialog';
 import { navigate } from '../app/router';
 import { useSession } from './context';
+import { cx } from './cx';
 
 /** 게임 중에 사이트 내 다른 페이지로 가면 게임을 끝낼지 묻는다 */
 function SiteLink({ href, class: cls, children }: { href: string; class?: string; children: ComponentChildren }) {
@@ -40,7 +41,7 @@ export function Footer() {
 
 export function Poster({ mini = false }: { mini?: boolean }) {
   return (
-    <div class={`poster ${mini ? 'poster-mini' : ''}`}>
+    <div class={cx('poster', mini && 'poster-mini')}>
       <div class="poster-top">2026 WORLD TOUR</div>
       <div class="poster-title">LUMINA</div>
       <div class="poster-sub">〈AFTERGLOW〉<br />IN SEOUL</div>
@@ -64,7 +65,7 @@ export function Calendar({ sel, enabled, soldout = [], onPick }: {
         {Array.from({ length: 31 }, (_, i) => {
           const d = i + 1, key = '10' + p2(d), on = enabled.includes(key);
           return (
-            <button key={key} class={`cal-day ${on ? 'on' : ''} ${sel === key ? 'sel' : ''} ${soldout.includes(key) ? 'so' : ''}`}
+            <button key={key} class={cx('cal-day', on && 'on', sel === key && 'sel', soldout.includes(key) && 'so')}
               disabled={!on} onClick={() => onPick?.(key)}>{d}</button>
           );
         })}

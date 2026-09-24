@@ -1,6 +1,6 @@
 // 모드 B: 취켓팅 — 클라이언트 쪽
 // 배속 · 잠자기 조작, 커뮤니티 피드 · 핫타임 타임라인, 예매창. 시간 흐름 자체는 서버(CancelServer)가 정한다.
-import { computed, signal } from '@preact/signals';
+import { batch, computed, signal } from '@preact/signals';
 import type {
   Blocked, CancelStatus, ConfirmResult, FeedItem, HotWindow, LockResult, LogLevel, LogSrc, PayMethod,
   Persisted, ReleaseResult, SeatView, SpeedMode,
@@ -26,7 +26,6 @@ export class CancelGame implements BookingGame {
   readonly venue = buildVenue();
   readonly stats = { taken: 0, captchaFails: 0, refreshes: 0, blocks: 0 };
 
-  readonly phase = signal<CancelPhase>('product');
   readonly flow = signal<BookingFlow | null>(null);
   readonly feed = signal<FeedItem[]>([]);
   /** 타임라인에 표시할(공개된) 핫타임 */
@@ -35,14 +34,18 @@ export class CancelGame implements BookingGame {
   /** 서버가 tick마다 보내 주는 HUD 상태 */
   readonly status = signal<CancelStatus | null>(null);
   readonly sleeping = computed(() => this.status.value?.sleepUntil != null);
-  persistLagMs: number | null = null;
+  private readonly booked = signal<{ ids: SeatId[]; bookingNo: string; at: number } | null>(null);
+  /** 내가 잡은 좌석의 결제 제한시각 (게임 시각). 선점 전 · 반환 후엔 null */
+  private readonly lockUntil = signal<number | null>(null);
+
+  readonly phase = computed<CancelPhase>(() => (this.booked.value ? 'done' : this.flow.value ? 'booking' : 'product'));
+  readonly timeLeft = computed(() => {
+    const until = this.lockUntil.value;
+    return until != null && !this.booked.value ? until - this.ctx.now.value : null;
+  });
 
   private alive = true;
   private deadlinePassed = false;
-  /** 내가 잡은 좌석과 결제 제한시각 (게임 시각) */
-  private lockIds: SeatId[] | null = null;
-  private lockUntil = 0;
-  private booked: { ids: SeatId[]; bookingNo: string; at: number } | null = null;
   private readonly realStart = performance.now();
 
   constructor(private readonly ctx: GameContext, readonly info: CancelInfo) {
@@ -55,8 +58,6 @@ export class CancelGame implements BookingGame {
     this.alive = false;
     this.flow.value?.close();
   }
-
-  frame(): void { this.flow.value?.checkTimer(); }
 
   log(src: LogSrc, msg: string, level?: LogLevel): void { this.ctx.log(src, msg, level); }
 
@@ -98,8 +99,7 @@ export class CancelGame implements BookingGame {
 
   // ================= 예매창 =================
   openBooking(): void {
-    if (this.flow.value || this.phase.value === 'done') return;
-    this.phase.value = 'booking';
+    if (this.phase.value !== 'product') return;
     const flow = new BookingFlow(this);
     this.flow.value = flow;
     flow.open({ captcha: true });
@@ -110,36 +110,34 @@ export class CancelGame implements BookingGame {
   }
 
   async lock(ids: SeatId[]): Promise<LockResult> {
+    const flow = this.flow.value;
     const r = await this.ctx.link.call('cancel.lock', { ids });
-    if (r.ok && this.alive) {
-      this.lockIds = ids;
-      this.lockUntil = this.ctx.clock.now() + LOCK_MS;
-    }
+    if (!r.ok || !this.alive) return r;
+    // 응답을 기다리는 사이 예매창을 닫았으면 잡힌 좌석은 바로 돌려준다 (주인 없는 선점 · 남은 시간이 남지 않게)
+    if (this.flow.value !== flow) void this.ctx.link.call('cancel.release', { ids });
+    else this.lockUntil.value = this.ctx.clock.now() + LOCK_MS;
     return r;
   }
 
   release(ids: SeatId[]): Promise<ReleaseResult> {
-    this.lockIds = null;
+    this.lockUntil.value = null;
     return this.ctx.link.call('cancel.release', { ids });
   }
 
   async pay(ids: SeatId[], method: PayMethod): Promise<ConfirmResult> {
     const r = await this.ctx.link.call('cancel.pay', { ids, method });
     if (r.ok && this.alive) {
-      this.phase.value = 'done';
-      this.lockIds = null;
-      this.booked = { ids, bookingNo: r.bookingNo, at: this.ctx.clock.now() };
+      batch(() => {
+        this.lockUntil.value = null;
+        this.booked.value = { ids, bookingNo: r.bookingNo, at: this.ctx.clock.now() };
+      });
     }
     return r;
   }
 
-  timeLeft(): number | null {
-    return this.lockIds && this.phase.value !== 'done' ? this.lockUntil - this.ctx.clock.now() : null;
-  }
-
   /** 선점 시간 만료: 서버는 락 만료 시 좌석을 다른 취켓러에게 넘긴다 */
   onTimeout(): void {
-    this.lockIds = null;
+    this.lockUntil.value = null;
     this.flow.value?.gotoSeat(false);
     void dialog.alert('좌석 선점 시간이 만료되었습니다.\n좌석을 다시 선택해 주세요.');
     if (this.deadlinePassed) this.finish(false, 'DEADLINE');
@@ -148,9 +146,10 @@ export class CancelGame implements BookingGame {
   onLockLost(): void { this.onTimeout(); }
 
   onAbort(): void {
-    this.flow.value = null;
-    this.lockIds = null;
-    this.phase.value = 'product';
+    batch(() => {
+      this.flow.value = null;
+      this.lockUntil.value = null;
+    });
     if (this.deadlinePassed) this.finish(false, 'DEADLINE');
   }
 
@@ -164,7 +163,7 @@ export class CancelGame implements BookingGame {
   finishSuccess(): void { this.finish(true, null); }
 
   private finish(success: boolean, reason: CancelResult['reason']): void {
-    const b = success ? this.booked : null;
+    const b = success ? this.booked.value : null;
     this.ctx.finish({
       kind: 'cancel', diff: this.label, diffKey: this.info.diff, success, reason,
       reasonText: reason ? { DEADLINE: '취소마감(관람일 전일 17:00)까지 표를 구하지 못했습니다.', GIVEUP: '취켓팅을 포기했습니다.' }[reason] : null,

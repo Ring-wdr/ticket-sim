@@ -6,6 +6,7 @@ import type { Game } from '../app/session';
 import { ddayLabel, type CancelGame } from '../game/cancelGame';
 import type { OpenGame } from '../game/openGame';
 import { useSession } from './context';
+import { cx } from './cx';
 
 // ---------- 오픈 티켓팅 ----------
 function OpenHud({ g }: { g: OpenGame }) {
@@ -27,10 +28,10 @@ function OpenHud({ g }: { g: OpenGame }) {
   );
 }
 
-function ServerClock({ g }: { g: OpenGame }) {
+function ServerClock() {
   const session = useSession();
   return (
-    <div class="srv-clock" hidden={!g.showServerClock.value}>
+    <div class="srv-clock">
       <div class="sc-head"><span>🕐 서버시간 확인</span><small>tickets.tikitaka.example</small></div>
       <div class="sc-time">{fmt.hmsms(session.now.value)}</div>
       <div class="sc-foot">응답 지연 약 <b>{session.tick.value?.latencyMs ?? '-'}</b>ms · 20:00:00 정각에 눌러보세요</div>
@@ -64,7 +65,7 @@ function Timeline({ g }: { g: CancelGame }) {
       {Array.from({ length: 9 }, (_, i) => i + 2).map(d =>
         <span key={d} class="tl-day" style={{ left: pos(T(2026, 10, d)) }}><i>10.{p2(d)}</i></span>)}
       {g.windows.value.map(w =>
-        <span key={w.from} class={`tl-win ${w.kind}`} title={w.label}
+        <span key={w.from} class={cx('tl-win', w.kind)} title={w.label}
           style={{ left: pos(w.from), width: `max(4px, ${((w.to - w.from) / (end - start) * 100).toFixed(3)}%)` }} />)}
       <span class="tl-now" style={{ left: `${now}%` }} />
     </div></div>
@@ -82,10 +83,10 @@ function CancelHud({ g }: { g: CancelGame }) {
       <div class="hud-in">
         <span class="hud-mode">🔁 취켓팅 <em>{g.label}</em></span>
         <span class="hud-item hud-time"><b>{fmt.mdd(now)} {fmt.hms(now)}</b><em>{ddayLabel(now)}</em></span>
-        <span class={`hud-speed ${(speed > 0 && speed <= 240) || st?.focus ? 'hot' : ''}`}>{speedLabel(g, speed)}</span>
+        <span class={cx('hud-speed', ((speed > 0 && speed <= 240) || st?.focus) && 'hot')}>{speedLabel(g, speed)}</span>
         <div class="hud-ctrl" role="group" aria-label="배속">
           {SPEED_BUTTONS.map(([m, icon, title]) =>
-            <button key={m} class={g.speedMode.value === m ? 'on' : ''} title={title} onClick={() => g.setSpeed(m)}>{icon}</button>)}
+            <button key={m} class={cx(g.speedMode.value === m && 'on')} title={title} onClick={() => g.setSpeed(m)}>{icon}</button>)}
           <button title="다음 날 09:00까지 스킵" onClick={() => void g.toggleSleep()}>{g.sleeping.value ? '☀️ 깨어나기' : '💤 잠자기'}</button>
         </div>
         <span class="hud-sp" />
@@ -105,12 +106,12 @@ function Feed({ g }: { g: CancelGame }) {
   }, [items.length]);
   return (
     <aside class="feed">
-      <div class="feed-head"><b>💬 취켓팅 커뮤니티</b><span>실시간</span></div>
+      <div class="feed-head"><b>💬 취켓팅 커뮤니티</b><span>● 실시간</span></div>
       <ol class="feed-list" ref={list}>
         {items.map((it, i) => (
-          <li key={i} class={it.hint ? 'hint' : ''}>
+          <li key={i} class={cx(it.hint && 'hint')}>
             <div class="fi-head"><b>{it.user}</b><time>{fmt.mdd(it.t)} {fmt.hm(it.t)}</time></div>
-            <p>{it.text}</p>
+            <p>{it.hint && '📌 '}{it.text}</p>
           </li>
         ))}
       </ol>
@@ -124,5 +125,6 @@ export function Hud({ g }: { g: Game }) {
 }
 
 export function Side({ g }: { g: Game }) {
-  return g.kind === 'open' ? <ServerClock g={g} /> : <Feed g={g} />;
+  if (g.kind === 'cancel') return <Feed g={g} />;
+  return g.showServerClock.value ? <ServerClock /> : null;
 }

@@ -1,6 +1,6 @@
 // 모드 A: 오픈 티켓팅 — 클라이언트 쪽
 // 예매하기 → 대기열 등록 → Adaptive Polling + Jitter → 입장 → 예매창(보안문자 · 좌석 · 결제)
-import { signal } from '@preact/signals';
+import { batch, computed, signal } from '@preact/signals';
 import type { Blocked, ConfirmResult, Expired, LockResult, LogLevel, LogSrc, PayMethod, Persisted, ReleaseResult, SeatView } from '../../shared/model';
 import type { GameInfo } from '../../shared/protocol';
 import { fmt } from '../../shared/time';
@@ -36,7 +36,6 @@ export class OpenGame implements BookingGame {
   /** 내 PC 시계가 서버보다 빠른(+)/느린(-) 정도 */
   readonly pcOffset = Math.round(Math.random() * 1400 - 700);
 
-  readonly phase = signal<OpenPhase>('product');
   readonly date = signal<string | null>(null);
   /** 예매하기 요청 중 (버튼 "접속 중…") */
   readonly entering = signal(false);
@@ -46,16 +45,24 @@ export class OpenGame implements BookingGame {
   readonly showServerClock = signal(true);
   /** 상품 페이지에서 F5 → 잠깐 흐려지는 연출 */
   readonly reloading = signal(false);
-  persistLagMs: number | null = null;
+  private readonly booked = signal<{ ids: SeatId[]; bookingNo: string } | null>(null);
+  /** active:user TTL이 끝나는 게임 시각 (입장 전 · 예매창을 닫은 뒤엔 null) */
+  private readonly activeUntil = signal<number | null>(null);
+
+  /** 진행 단계는 따로 저장하지 않고 대기창 · 예매창 · 예매 결과에서 끌어낸다 (서로 어긋날 수 없게) */
+  readonly phase = computed<OpenPhase>(() =>
+    this.booked.value ? 'done' : this.flow.value ? 'booking' : this.queue.value ? 'queue' : 'product');
+  readonly timeLeft = computed(() => {
+    const until = this.activeUntil.value;
+    return until != null && this.phase.value === 'booking' ? until - this.ctx.now.value : null;
+  });
 
   private alive = true;
   private pollTimer: ClockTimer | null = null;
   private firstClick: { clickedAt: number; arrivedAt: number; rank: number } | null = null;
   private queueStart = 0;
-  private activeUntil = 0;
   private waitSec: number | null = null;
   private soldPctAtEntry: number | null = null;
-  private booked: { ids: SeatId[]; bookingNo: string } | null = null;
 
   constructor(private readonly ctx: GameContext, readonly info: OpenInfo) {}
 
@@ -67,8 +74,6 @@ export class OpenGame implements BookingGame {
     this.ctx.clock.clear(this.pollTimer);
     this.flow.value?.close();
   }
-
-  frame(): void { this.flow.value?.checkTimer(); }
 
   log(src: LogSrc, msg: string, level?: LogLevel): void { this.ctx.log(src, msg, level); }
 
@@ -96,13 +101,14 @@ export class OpenGame implements BookingGame {
     }
     this.firstClick ??= { clickedAt, arrivedAt: r.arrivedAt, rank: r.rank };
     if (isRequeue) toast('대기순서가 초기화되었습니다.', 'warn');
-    this.uuid.value = r.uuid;
-    this.phase.value = 'queue';
     this.queueStart = r.arrivedAt;
-    this.queue.value = {
-      rank: r.rank, behind: 0, est: r.rank / this.info.batch, nextPollTtl: 1, initialRank: r.rank,
-      polling: true, nextPollAt: null, jitter: 0,
-    };
+    batch(() => {
+      this.uuid.value = r.uuid;
+      this.queue.value = {
+        rank: r.rank, behind: 0, est: r.rank / this.info.batch, nextPollTtl: 1, initialRank: r.rank,
+        polling: true, nextPollAt: null, jitter: 0,
+      };
+    });
     void this.poll();
   }
 
@@ -116,7 +122,7 @@ export class OpenGame implements BookingGame {
     if (!this.alive || this.uuid.value !== uuid || this.phase.value !== 'queue') return;
     if (r.status === 'ACTIVE') { this.enterBooking(r.ttl, r.soldPct); return; }
     if (r.status === 'GONE') {
-      this.phase.value = 'product';
+      this.leaveQueue();
       await dialog.alert('대기 정보가 만료되었습니다. 다시 시도해 주세요.');
       return;
     }
@@ -139,21 +145,23 @@ export class OpenGame implements BookingGame {
 
   private leaveQueue(): void {
     this.ctx.clock.clear(this.pollTimer);
-    this.phase.value = 'product';
-    this.uuid.value = null;
-    this.queue.value = null;
+    batch(() => {
+      this.uuid.value = null;
+      this.queue.value = null;
+    });
   }
 
   private enterBooking(ttl: number, soldPct: number): void {
     const now = this.ctx.clock.now();
-    this.phase.value = 'booking';
-    this.queue.value = null;
-    this.activeUntil = now + ttl * 1000;
     this.soldPctAtEntry ??= soldPct;
     this.waitSec ??= (now - this.queueStart) / 1000;
     this.log('system', `입장 허용 · active:user TTL ${ttl}초`, 'ok');
     const flow = new BookingFlow(this);
-    this.flow.value = flow;
+    batch(() => {
+      this.queue.value = null;
+      this.activeUntil.value = now + ttl * 1000;
+      this.flow.value = flow;
+    });
     flow.open({ captcha: true });
   }
 
@@ -173,37 +181,35 @@ export class OpenGame implements BookingGame {
   async pay(ids: SeatId[], method: PayMethod): Promise<ConfirmResult> {
     const r = await this.ctx.link.call('open.pay', { uuid: this.uuid.value ?? '', ids, method });
     if (r.ok && this.alive) {
-      this.phase.value = 'done';
-      this.booked = { ids, bookingNo: r.bookingNo };
+      this.booked.value = { ids, bookingNo: r.bookingNo };
+      // 결제 응답을 기다리는 사이 제한시간이 끝나 예매창이 닫혔어도 예매는 성공이다
+      if (!this.flow.value) this.finishSuccess();
     }
     return r;
   }
 
-  timeLeft(): number | null {
-    return this.phase.value === 'booking' ? this.activeUntil - this.ctx.clock.now() : null;
-  }
-
   onTimeout(): void {
     this.log('system', 'active:user TTL 만료 → 예매창 종료', 'warn');
-    this.closeFlow();
-    this.phase.value = 'product';
-    this.uuid.value = null;
+    this.leaveBooking();
     void dialog.alert('예매 가능 시간이 만료되었습니다.\n다시 예매하려면 대기열에 재진입해야 합니다.');
   }
 
   onLockLost(): void { this.flow.value?.gotoSeat(false); }
 
   onAbort(): void {
-    this.flow.value = null;
-    this.phase.value = 'product';
-    this.uuid.value = null;
+    this.leaveBooking();
     this.stats.requeues++;
     toast('예매창을 닫았습니다. 다시 예매하려면 대기열에 재진입해야 합니다.');
   }
 
-  private closeFlow(): void {
+  /** 예매창을 닫고 상품 페이지로 (다시 예매하려면 대기열부터) */
+  private leaveBooking(): void {
     this.flow.value?.close();
-    this.flow.value = null;
+    batch(() => {
+      this.flow.value = null;
+      this.activeUntil.value = null;
+      this.uuid.value = null;
+    });
   }
 
   // ================= 서버 알림 =================
@@ -238,20 +244,21 @@ export class OpenGame implements BookingGame {
   finishSuccess(): void { this.finish(true, null); }
 
   private finish(success: boolean, reason: OpenResult['reason']): void {
-    const seats = success && this.booked ? this.booked.ids.map(id => seatOf(this.venue, id)) : [];
+    const booked = success ? this.booked.value : null;
+    const seats = booked ? booked.ids.map(id => seatOf(this.venue, id)) : [];
     const fc = this.firstClick;
     this.ctx.finish({
       kind: 'open', diff: this.label, diffKey: this.info.diff, success, reason,
       reasonText: reason ? { SOLDOUT: '전석 매진되었습니다.', GIVEUP: '예매를 포기했습니다.', TIMEOUT: '예매 가능 시간이 만료되었습니다.' }[reason] : null,
       seats: seats.map(s => ({ grade: s.grade, label: s.label })),
-      bookingNo: this.booked?.bookingNo ?? null,
+      bookingNo: this.booked.value?.bookingNo ?? null,
       dateLabel: this.dateLabel(),
       reactionMs: fc ? fc.arrivedAt - this.openAt : null,
       clickErrMs: fc ? fc.clickedAt - this.openAt : null,
       rank: fc?.rank ?? null,
       pcOffset: this.pcOffset, early: this.stats.early, waitSec: this.waitSec,
       soldPctAtEntry: this.soldPctAtEntry, taken: this.stats.taken, captchaFails: this.stats.captchaFails,
-      requeues: this.stats.requeues, persistLagMs: this.persistLagMs,
+      requeues: this.stats.requeues, persistLagMs: this.flow.value?.persistLag.value ?? null,
       elapsed: (this.ctx.clock.now() - this.openAt) / 1000,
     });
   }

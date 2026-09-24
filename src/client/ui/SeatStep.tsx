@@ -1,10 +1,10 @@
 // 02 좌석 선택: 구역도(SVG) → 구역 좌석 그리드. 보이는 좌석은 "조회 기준" 시각의 스냅샷이다.
-import { useEffect, useState } from 'preact/hooks';
 import { fmt } from '../../shared/time';
-import { wallNow } from '../../shared/wall';
 import { GRADES, GRADE_KEYS, seatId, seatOf } from '../../shared/venue';
 import type { SeatPicker } from '../game/seatPicker';
 import type { BookingGame } from '../game/types';
+import { useSession } from './context';
+import { cx } from './cx';
 
 function ZoneMap({ picker, game }: { picker: SeatPicker; game: BookingGame }) {
   const v = picker.view.value!;
@@ -17,7 +17,7 @@ function ZoneMap({ picker, game }: { picker: SeatPicker; game: BookingGame }) {
           const [x, y, w, h] = z.rect;
           const n = v.zoneCounts[z.id] ?? 0;
           return (
-            <g key={z.id} class={`zone ${n > 0 ? '' : 'soldout'}`} onClick={() => void picker.load(z.id)}>
+            <g key={z.id} class={cx('zone', n === 0 && 'soldout')} onClick={() => void picker.load(z.id)}>
               <rect x={x} y={y} width={w} height={h} rx="5" fill={n > 0 ? GRADES[z.grade].color : '#d4d4db'} />
               <text x={x + w / 2} y={y + h / 2 - 6}>{z.id}</text>
               <text class="cnt" x={x + w / 2} y={y + h / 2 + 12}>{n > 0 ? `${n}석` : '매진'}</text>
@@ -42,7 +42,7 @@ function SeatGrid({ picker, game }: { picker: SeatPicker; game: BookingGame }) {
       const id = seatId(z.id, r, c);
       const on = avail.has(id);
       cells.push(
-        <button key={id} class={`seat ${on ? 'on' : ''} ${selected.includes(id) ? 'sel' : ''}`} disabled={!on}
+        <button key={id} class={cx('seat', on && 'on', selected.includes(id) && 'sel')} disabled={!on}
           title={seatOf(game.venue, id).label} style={{ '--c': g.color }} onClick={() => picker.toggle(id)} />,
       );
     }
@@ -59,13 +59,9 @@ function SeatGrid({ picker, game }: { picker: SeatPicker; game: BookingGame }) {
   );
 }
 
-/** 접근 제한 중 좌석도 위 카운트다운 */
+/** 접근 제한 중 좌석도 위 카운트다운 (실제 시각 기준 — 게임 시간이 멈춰도 흐른다) */
 function BlockedOverlay({ until }: { until: number }) {
-  const [left, setLeft] = useState(until - wallNow());
-  useEffect(() => {
-    const iv = setInterval(() => setLeft(until - wallNow()), 200);
-    return () => clearInterval(iv);
-  }, [until]);
+  const left = until - useSession().wall.value;
   if (left <= 0) return null;
   return <div class="seat-blocked"><b>⛔ 접근 제한</b><span>{Math.ceil(left / 1000)}초 후 해제</span></div>;
 }
@@ -74,7 +70,7 @@ export function SeatStep({ picker, game }: { picker: SeatPicker; game: BookingGa
   const v = picker.view.value;
   const selected = picker.selected.value;
   return (
-    <div class={`seat-step ${picker.busy.value ? 'is-loading' : ''}`}>
+    <div class={cx('seat-step', picker.busy.value && 'is-loading')}>
       <div class="seat-main">
         <div class="seat-toolbar">
           <button class="btn-sm" onClick={() => void picker.load(null)}>전체 좌석도</button>
@@ -86,13 +82,13 @@ export function SeatStep({ picker, game }: { picker: SeatPicker; game: BookingGa
             : picker.zone.value ? <SeatGrid picker={picker} game={game} /> : <ZoneMap picker={picker} game={game} />}
         </div>
         {game.seatHint && <div class="seat-hint">{game.seatHint}</div>}
-        <BlockedOverlay until={picker.blockedUntil.value} />
+        {picker.blockedUntil.value > 0 && <BlockedOverlay until={picker.blockedUntil.value} />}
       </div>
       <aside class="seat-side">
         <div class="side-box"><h4>좌석등급 / 잔여석</h4>
           <ul class="grade-list">{v && GRADE_KEYS.map(k => {
             const g = GRADES[k];
-            return <li key={k}><i style={{ background: g.color }} /><span class="gn">{g.name}</span><span class="gp">{fmt.won(g.price)}</span><b class={v.stock[k] ? '' : 'zero'}>{v.stock[k]}석</b></li>;
+            return <li key={k}><i style={{ background: g.color }} /><span class="gn">{g.name}</span><span class="gp">{fmt.won(g.price)}</span><b class={cx(!v.stock[k] && 'zero')}>{v.stock[k]}석</b></li>;
           })}</ul>
         </div>
         <div class="side-box"><h4>선택좌석 <small>최대 {game.maxSeats}매</small></h4>
@@ -103,7 +99,7 @@ export function SeatStep({ picker, game }: { picker: SeatPicker; game: BookingGa
             })
             : <li class="muted">선택한 좌석이 없습니다.</li>}</ul>
         </div>
-        <button class={`btn-primary btn-block btn-done ${picker.locking.value ? 'loading' : ''}`} onClick={() => void picker.done()}>
+        <button class="btn-primary btn-block btn-done" disabled={picker.locking.value} onClick={() => void picker.done()}>
           {picker.locking.value ? '처리 중…' : '좌석선택완료'}
         </button>
       </aside>

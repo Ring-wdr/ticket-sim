@@ -20,7 +20,7 @@ export function QueueWindow({ g }: { g: OpenGame }) {
         <div class="q-logo"><span class="logo-mark">T</span>티키타카 TICKET</div>
         <h2>접속 대기 중입니다</h2>
         <p class="q-sub">현재 접속 인원이 많아 대기 중입니다.<br />잠시만 기다리시면 예매 페이지로 자동 연결됩니다.</p>
-        <div class="q-rank"><span>나의 대기순서</span><strong>{fmt.num(q.rank)}</strong></div>
+        <div class="q-rank"><span>나의 대기순서</span><strong>{fmt.num(q.rank)}<small>번째</small></strong></div>
         <div class="q-bar"><i style={{ width: `${Math.max(2, Math.min(100, pct))}%` }} /></div>
         <div class="q-meta"><span>뒤에 <b>{fmt.num(q.behind)}</b>명</span><span>예상 대기 <b>{fmt.mmss(q.est * 1000)}</b></span></div>
         <div class="q-warn">새로고침(F5)하거나 창을 닫으면 대기순서가 초기화되어<br />대기시간이 더 길어질 수 있습니다.</div>

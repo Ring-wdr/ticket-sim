@@ -3,6 +3,7 @@ import { dialog, toast } from '../app/dialog';
 import { resultComment, resultRank, resultRows, resultText } from '../app/result';
 import { Footer, Header, Poster } from './common';
 import { useSession } from './context';
+import { cx } from './cx';
 
 export function ResultPage() {
   const session = useSession();
@@ -24,14 +25,14 @@ export function ResultPage() {
     <>
       <Header />
       <main class="container result-page">
-        <div class={`res-card ${r.success ? 'ok' : 'fail'}`}>
+        <div class={cx('res-card', r.success ? 'ok' : 'fail')}>
           <div class="res-top">
             <div>
               <span class="res-mode">{r.kind === 'open' ? '🎫 오픈 티켓팅' : '🔁 취켓팅'} · {r.diff}</span>
               <h1>{r.success ? '🎉 예매 성공!' : '😭 예매 실패'}</h1>
               <p>{resultComment(r)}</p>
             </div>
-            <div class={`res-rank rank-${rank}`}>{rank}</div>
+            <div class={cx('res-rank', `rank-${rank}`)}>{rank}</div>
           </div>
           {r.success ? (
             <div class="res-ticket"><Poster mini /><div>

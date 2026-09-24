@@ -1,8 +1,9 @@
 // 앱 상태: 현재 게임 · 결과 · 로그 · 서버 들여다보기.
 // 서버 이벤트를 받아 게임 컨트롤러로 보내고, 이전 게임의 늦은 이벤트는 버린다.
-import { effect, signal } from '@preact/signals';
+import { batch, effect, signal } from '@preact/signals';
 import type { DiffKey, InspectSnapshot, LogEntry, LogLevel, LogSrc, ModeKind } from '../../shared/model';
 import type { ServerEvent, Tick } from '../../shared/protocol';
+import { wallNow } from '../../shared/wall';
 import { CancelGame } from '../game/cancelGame';
 import { OpenGame } from '../game/openGame';
 import type { GameContext } from '../game/types';
@@ -20,8 +21,10 @@ export class Session implements GameContext {
   readonly game = signal<Game | null>(null);
   readonly lastResult = signal<GameResult | null>(null);
   readonly tick = signal<Tick | null>(null);
-  /** 화면 갱신용 게임 시각 (FRAME_MS마다) */
+  /** 화면 갱신용 게임 시각 (FRAME_MS마다). 남은 시간 · 시계 표시는 모두 이걸 따라 다시 계산된다 */
   readonly now = signal(0);
+  /** 같은 주기의 실제 시각 (접근 제한 카운트다운처럼 게임 시간이 멈춰도 흐르는 것) */
+  readonly wall = signal(0);
   readonly logs = signal<LogEntry[]>([]);
   readonly inspectorOpen = signal(false);
   readonly inspect = signal<InspectSnapshot | null>(null);
@@ -98,8 +101,10 @@ export class Session implements GameContext {
   }
 
   private frame(): void {
-    this.now.value = this.clock.now();
-    this.game.value?.frame();
+    batch(() => {
+      this.now.value = this.clock.now();
+      this.wall.value = wallNow();
+    });
   }
 
   private pushLogs(entries: LogEntry[]): void {

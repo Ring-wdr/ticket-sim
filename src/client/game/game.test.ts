@@ -1,12 +1,16 @@
+import { signal } from '@preact/signals';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { LockResult, SeatView } from '../../shared/model';
+import type { LockResult, QueueStatus, SeatView } from '../../shared/model';
 import { dialogs } from '../app/dialog';
 import { Session } from '../app/session';
 import { GameClock } from '../net/gameClock';
 import { createInProcessLink } from '../net/inProcessLink';
 import type { ServerLink } from '../net/link';
 import { buildVenue } from '../../shared/venue';
+import { OPEN_DIFF } from '../../sim/modes/openServer';
+import type { GameResult } from '../app/result';
 import { BookingFlow } from './bookingFlow';
+import { CancelGame } from './cancelGame';
 import { SeatPicker } from './seatPicker';
 import type { BookingGame } from './types';
 
@@ -15,10 +19,19 @@ const wall = (): number => Date.now();
 let link: ServerLink;
 let session: Session;
 let navs: string[];
+/** 참이면 대기열 순번 조회에 서버 대신 GONE으로 답한다 */
+let forceGone: boolean;
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date', 'performance'] });
-  link = createInProcessLink({ wallNow: wall });
+  forceGone = false;
+  const real = createInProcessLink({ wallNow: wall });
+  link = {
+    ...real,
+    call: ((method, params) => (method === 'open.status' && forceGone
+      ? Promise.resolve<QueueStatus>({ status: 'GONE' })
+      : real.call(method, params))) as ServerLink['call'],
+  };
   navs = [];
   session = new Session(link, p => navs.push(p), new GameClock(wall));
   dialogs.value = [];
@@ -121,6 +134,41 @@ describe('오픈 티켓팅 (Session + OpenGame + 가상 서버)', () => {
     expect(g.uuid.value).not.toBe(first);
   });
 
+  it('예매창 제한시간(active TTL)이 끝나면 예매창이 닫히고 상품 페이지로 돌아간다', async () => {
+    const g = await startOpen();
+    g.selectDate('1010');
+    await until(() => session.clock.now() > g.openAt + 200, 30_000);
+    void g.clickBook();
+    await until(() => g.phase.value === 'booking', 120_000, 200);
+    const flow = g.flow.value!;
+    const ttl = OPEN_DIFF.easy.activeTtl * 1000;
+    expect(g.timeLeft.value).toBeGreaterThan(ttl - 5_000);
+
+    await until(() => g.phase.value === 'product', ttl + 10_000, 1000);
+    expect(answer()).toContain('예매 가능 시간이 만료되었습니다');
+    expect(g.flow.value).toBeNull();
+    expect(g.uuid.value).toBeNull();
+    expect(g.timeLeft.value).toBeNull();
+    // 닫힌 예매창은 더 이상 만료를 알리지 않는다
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(dialogs.value).toEqual([]);
+    expect(flow.picker.value).not.toBeNull();
+  });
+
+  it('대기 정보가 사라지면(GONE) 대기창도 닫힌다', async () => {
+    const g = await startOpen();
+    g.selectDate('1010');
+    await until(() => session.clock.now() > g.openAt + 1500, 30_000);
+    void g.clickBook();
+    await until(() => g.phase.value === 'queue');
+    forceGone = true;
+    await until(() => dialogs.value.length > 0, 30_000);
+    expect(answer()).toContain('대기 정보가 만료되었습니다');
+    expect(g.queue.value).toBeNull();
+    expect(g.uuid.value).toBeNull();
+    expect(g.phase.value).toBe('product');
+  });
+
   it('게임을 바꿔도 이전 게임의 늦은 tick이 새 게임 시계를 망치지 않는다', async () => {
     const p1 = session.start('cancel', 'normal');
     await until(() => session.game.value != null);
@@ -138,8 +186,8 @@ describe('SeatPicker', () => {
     const view: SeatView = { at: 0, stock: { VIP: 5, R: 0, S: 0 }, zoneCounts: { A: 2 }, avail: ['A-1-1', 'A-1-2'], zone: 'A' };
     return {
       kind: 'open', maxSeats: 2, seatHint: null, venue: buildVenue(),
-      stats: { taken: 0, captchaFails: 0, refreshes: 0, blocks: 0 }, persistLagMs: null,
-      dateLabel: () => '', fmtTime: () => '', timeLeft: () => null,
+      stats: { taken: 0, captchaFails: 0, refreshes: 0, blocks: 0 }, timeLeft: signal(null),
+      dateLabel: () => '', fmtTime: () => '',
       seatView: async () => view,
       lock: async () => lockResult,
       release: async () => ({ ok: 1, released: 0 }),
@@ -177,7 +225,26 @@ describe('SeatPicker', () => {
     await paying;
     expect(flow.step.value).toBe(6);
     expect(flow.persistLag.value).toBe(250);
-    expect(game.persistLagMs).toBe(250);
+  });
+
+  it('제한시간 만료는 만료될 때마다 한 번씩만 알리고, 닫힌 예매창은 알리지 않는다', () => {
+    const left = signal<number | null>(null);
+    let timeouts = 0;
+    const flow = new BookingFlow({ ...fakeGame({ ok: 1 }), timeLeft: left, onTimeout: () => { timeouts++; } });
+    flow.open({ captcha: false });
+    left.value = 5000;
+    expect(timeouts).toBe(0);
+    left.value = 0;
+    left.value = -50;
+    expect(timeouts).toBe(1);
+    left.value = null; // 좌석 반환
+    left.value = 300_000; // 다시 선점
+    left.value = -1;
+    expect(timeouts).toBe(2);
+    flow.close();
+    left.value = 1000;
+    left.value = 0;
+    expect(timeouts).toBe(2);
   });
 
   it('최대 매수를 넘기면 막는다', async () => {
@@ -187,5 +254,52 @@ describe('SeatPicker', () => {
     p.toggle('A-1-2');
     expect(answer()).toBe('1인 최대 1매까지 선택 가능합니다.');
     expect(p.selected.value).toEqual(['A-1-1']);
+  });
+});
+
+describe('CancelGame 선점 시간', () => {
+  /** 서버 대신 handlers가 답하는 취켓팅 게임 (답이 없는 요청은 영원히 대기) */
+  function fakeCancel(handlers: Record<string, () => Promise<unknown>>) {
+    const now = signal(0);
+    const calls: string[] = [];
+    const results: GameResult[] = [];
+    const link = {
+      where: 'main', on: () => () => {}, dispose() {},
+      call: (m: string) => { calls.push(m); return handlers[m]?.() ?? new Promise(() => {}); },
+    } as unknown as ServerLink;
+    const clock = { now: () => now.value } as unknown as GameClock;
+    const g = new CancelGame(
+      { link, clock, now, log() {}, finish: r => { results.push(r); } },
+      { mode: 'cancel', game: 1, diff: 'normal', label: '보통', now: 0, start: 0, end: 1, windows: [] },
+    );
+    return { g, now, calls, results };
+  }
+
+  it('취소마감 뒤 선점 시간이 끝나면 DEADLINE으로 끝난다', async () => {
+    const { g, now, results } = fakeCancel({ 'cancel.lock': async () => ({ ok: 1 }) });
+    g.openBooking();
+    await g.lock(['A-1-1']);
+    expect(g.timeLeft.value).toBe(300_000);
+    g.onDeadline(false); // 결제 중이면 마무리까지 기다린다
+    expect(results).toEqual([]);
+    now.value = 300_001;
+    expect(answer()).toContain('좌석 선점 시간이 만료되었습니다');
+    expect(results).toMatchObject([{ kind: 'cancel', success: false, reason: 'DEADLINE' }]);
+  });
+
+  it('선점 응답 전에 예매창을 닫으면 잡힌 좌석을 돌려주고 남은 시간도 남기지 않는다', async () => {
+    let resolveLock!: (v: LockResult) => void;
+    const { g, calls } = fakeCancel({ 'cancel.lock': () => new Promise<LockResult>(r => { resolveLock = r; }) });
+    g.openBooking();
+    const flow = g.flow.value!;
+    const locking = g.lock(['A-1-1']);
+    const closing = flow.askClose();
+    answer(true);
+    await closing;
+    expect(g.phase.value).toBe('product');
+    resolveLock({ ok: 1 });
+    await locking;
+    expect(g.timeLeft.value).toBeNull();
+    expect(calls).toContain('cancel.release');
   });
 });

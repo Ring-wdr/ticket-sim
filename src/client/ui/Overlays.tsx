@@ -3,7 +3,9 @@ import { useEffect, useRef } from 'preact/hooks';
 import type { LogSrc } from '../../shared/model';
 import { fmt } from '../../shared/time';
 import { dialogs, toasts, type DialogReq } from '../app/dialog';
+import type { Game } from '../app/session';
 import { useSession } from './context';
+import { cx } from './cx';
 
 function Dialog({ d, top }: { d: DialogReq; top: boolean }) {
   const primary = useRef<HTMLButtonElement>(null);
@@ -24,7 +26,7 @@ function Dialog({ d, top }: { d: DialogReq; top: boolean }) {
       <div class="dlg-msg">{d.msg.split('\n').map((line, i) => <span key={i}>{i > 0 && <br />}{line}</span>)}</div>
       <div class="dlg-actions">
         {d.buttons.map(b => (
-          <button key={b.label} ref={b.primary ? primary : undefined} class={`dlg-btn ${b.primary ? 'primary' : ''}`} onClick={() => d.close(b.value)}>{b.label}</button>
+          <button key={b.label} ref={b.primary ? primary : undefined} class={cx('dlg-btn', b.primary && 'primary')} onClick={() => d.close(b.value)}>{b.label}</button>
         ))}
       </div>
     </div></div>
@@ -33,11 +35,11 @@ function Dialog({ d, top }: { d: DialogReq; top: boolean }) {
 
 export function Dialogs() {
   const list = dialogs.value;
-  return <div id="dialogs">{list.map((d, i) => <Dialog key={d.id} d={d} top={i === list.length - 1} />)}</div>;
+  return <>{list.map((d, i) => <Dialog key={d.id} d={d} top={i === list.length - 1} />)}</>;
 }
 
 export function Toasts() {
-  return <div id="toasts">{toasts.value.map(t => <div key={t.id} class={`toast ${t.kind} ${t.out ? 'out' : ''}`}>{t.msg}</div>)}</div>;
+  return <div class="toasts">{toasts.value.map(t => <div key={t.id} class={cx('toast', t.kind, t.out && 'out')}>{t.msg}</div>)}</div>;
 }
 
 const CHECKLIST: [string, string][] = [
@@ -49,16 +51,15 @@ const CHECKLIST: [string, string][] = [
 ];
 const SRC_LABEL: Record<LogSrc, string> = { system: 'SYS', scheduler: 'SCHED', redis: 'REDIS', lua: 'LUA', mq: 'MQ', api: 'API', cancel: 'CANCEL', bot: 'BOT' };
 
-export function Inspector() {
+export function Inspector({ g }: { g: Game }) {
   const session = useSession();
-  const g = session.game.value;
   const open = session.inspectorOpen.value;
   const snap = session.inspect.value;
   const toggle = (): void => { session.inspectorOpen.value = !open; };
-  const logTime = g?.kind === 'cancel' ? (t: number) => `${fmt.mdd(t)} ${fmt.hms(t)}` : fmt.hmsms;
+  const logTime = g.kind === 'cancel' ? (t: number) => `${fmt.mdd(t)} ${fmt.hms(t)}` : fmt.hmsms;
   return (
-    <div id="inspector" hidden={!g} class={open ? 'open' : ''}>
-      <button class="insp-fab" onClick={toggle}>🛠 서버 들여다보기</button>
+    <div class={cx('inspector', open && 'open')}>
+      {!open && <button class="insp-fab" onClick={toggle}>🛠 서버 들여다보기</button>}
       <div class="insp-panel">
         <div class="insp-head"><div><b>🛠 서버 들여다보기</b><span>{session.link.where === 'worker' ? 'Web Worker 안에서' : '메인 스레드에서'} 돌아가는 가상 서버</span></div><button title="닫기" onClick={toggle}>✕</button></div>
         {open && (

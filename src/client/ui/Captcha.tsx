@@ -1,5 +1,6 @@
 // 안심예매 보안문자 (게임 내 연출용 캡차)
 import { useEffect, useRef, useState } from 'preact/hooks';
+import { cx } from './cx';
 
 const CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
 
@@ -63,7 +64,7 @@ export function Captcha({ onPass, onFail }: { onPass: () => void; onFail: () => 
   return (
     <div class="cap-overlay">
       {/* key를 바꿔 흔들림 애니메이션을 다시 재생한다 */}
-      <div class={`cap-box ${shake ? 'shake' : ''}`} key={shake}>
+      <div class={cx('cap-box', shake > 0 && 'shake')} key={shake}>
         <div class="cap-title"><span class="cap-shield">🛡</span><b>안심예매</b> 보안문자 입력</div>
         <p class="cap-desc">부정 예매 방지를 위해 아래 문자를 입력해 주세요.<br />인증 후 좌석을 선택할 수 있습니다.</p>
         <div class="cap-img"><canvas ref={canvas} width={230} height={66} /><button class="cap-re" type="button" title="새로운 문자" onClick={regen}>↻</button></div>
