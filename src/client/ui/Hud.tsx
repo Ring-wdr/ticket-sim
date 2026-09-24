@@ -6,24 +6,24 @@ import type { Game } from '../app/session';
 import { ddayLabel, type CancelGame } from '../game/cancelGame';
 import type { OpenGame } from '../game/openGame';
 import { useSession } from './context';
-import { cx } from './cx';
+import * as s from './Hud.css';
 
 // ---------- 오픈 티켓팅 ----------
 function OpenHud({ g }: { g: OpenGame }) {
   const session = useSession();
   const pcNow = session.now.value + g.pcOffset;
   return (
-    <div class="hud-in">
-      <span class="hud-mode">🎫 오픈 티켓팅 <em>{g.label}</em></span>
-      <span class="hud-item">내 PC 시계 <b>{fmt.hms(pcNow)}</b></span>
-      <span class="hud-item">
+    <div class={s.bar}>
+      <span class={s.mode}>🎫 오픈 티켓팅 <em class={s.modeBadge}>{g.label}</em></span>
+      <span>내 PC 시계 <b class={s.value}>{fmt.hms(pcNow)}</b></span>
+      <span>
         {pcNow < g.openAt
-          ? <>오픈까지 <b>{fmt.mmss(g.openAt - pcNow)}</b> <small>(내 PC 기준)</small></>
-          : <>오픈 후 <b>+{fmt.mmss(pcNow - g.openAt)}</b></>}
+          ? <>오픈까지 <b class={s.value}>{fmt.mmss(g.openAt - pcNow)}</b> <small class={s.note}>(내 PC 기준)</small></>
+          : <>오픈 후 <b class={s.value}>+{fmt.mmss(pcNow - g.openAt)}</b></>}
       </span>
-      <span class="hud-sp" />
-      <button class="hud-btn" onClick={() => { g.showServerClock.value = !g.showServerClock.value; }}>⏱ 서버시간</button>
-      <button class="hud-btn" onClick={() => void g.giveUp()}>포기하기</button>
+      <span class={s.spacer} />
+      <button class={s.btn} onClick={() => { g.showServerClock.value = !g.showServerClock.value; }}>⏱ 서버시간</button>
+      <button class={s.btn} onClick={() => void g.giveUp()}>포기하기</button>
     </div>
   );
 }
@@ -31,10 +31,10 @@ function OpenHud({ g }: { g: OpenGame }) {
 function ServerClock() {
   const session = useSession();
   return (
-    <div class="srv-clock">
-      <div class="sc-head"><span>🕐 서버시간 확인</span><small>tickets.tikitaka.example</small></div>
-      <div class="sc-time">{fmt.hmsms(session.now.value)}</div>
-      <div class="sc-foot">응답 지연 약 <b>{session.tick.value?.latencyMs ?? '-'}</b>ms · 20:00:00 정각에 눌러보세요</div>
+    <div class={s.srvClock}>
+      <div class={s.srvHead}><span>🕐 서버시간 확인</span><small class={s.srvHost}>tickets.tikitaka.example</small></div>
+      <div class={s.srvTime}>{fmt.hmsms(session.now.value)}</div>
+      <div class={s.srvFoot}>응답 지연 약 <b>{session.tick.value?.latencyMs ?? '-'}</b>ms · 20:00:00 정각에 눌러보세요</div>
     </div>
   );
 }
@@ -61,13 +61,13 @@ function Timeline({ g }: { g: CancelGame }) {
   const pos = (t: number): string => `${((t - start) / (end - start) * 100).toFixed(3)}%`;
   const now = Math.min(100, (session.now.value - start) / (end - start) * 100);
   return (
-    <div class="hud-tl"><div class="tl-track">
+    <div class={s.timeline}><div class={s.track}>
       {Array.from({ length: 9 }, (_, i) => i + 2).map(d =>
-        <span key={d} class="tl-day" style={{ left: pos(T(2026, 10, d)) }}><i>10.{p2(d)}</i></span>)}
+        <span key={d} class={s.day} style={{ left: pos(T(2026, 10, d)) }}><i class={s.dayLabel}>10.{p2(d)}</i></span>)}
       {g.windows.value.map(w =>
-        <span key={w.from} class={cx('tl-win', w.kind)} title={w.label}
+        <span key={w.from} class={s.hotWindow({ kind: w.kind })} title={w.label}
           style={{ left: pos(w.from), width: `max(4px, ${((w.to - w.from) / (end - start) * 100).toFixed(3)}%)` }} />)}
-      <span class="tl-now" style={{ left: `${now}%` }} />
+      <span class={s.nowMark} style={{ left: `${now}%` }} />
     </div></div>
   );
 }
@@ -80,17 +80,17 @@ function CancelHud({ g }: { g: CancelGame }) {
   const st = g.status.value;
   return (
     <>
-      <div class="hud-in">
-        <span class="hud-mode">🔁 취켓팅 <em>{g.label}</em></span>
-        <span class="hud-item hud-time"><b>{fmt.mdd(now)} {fmt.hms(now)}</b><em>{ddayLabel(now)}</em></span>
-        <span class={cx('hud-speed', ((speed > 0 && speed <= 240) || st?.focus) && 'hot')}>{speedLabel(g, speed)}</span>
-        <div class="hud-ctrl" role="group" aria-label="배속">
+      <div class={s.bar}>
+        <span class={s.mode}>🔁 취켓팅 <em class={s.modeBadge}>{g.label}</em></span>
+        <span><b class={`${s.value} ${s.time}`}>{fmt.mdd(now)} {fmt.hms(now)}</b><em class={s.dday}>{ddayLabel(now)}</em></span>
+        <span class={s.speed({ hot: (speed > 0 && speed <= 240) || !!st?.focus })}>{speedLabel(g, speed)}</span>
+        <div class={s.ctrl} role="group" aria-label="배속">
           {SPEED_BUTTONS.map(([m, icon, title]) =>
-            <button key={m} class={cx(g.speedMode.value === m && 'on')} title={title} onClick={() => g.setSpeed(m)}>{icon}</button>)}
-          <button title="다음 날 09:00까지 스킵" onClick={() => void g.toggleSleep()}>{g.sleeping.value ? '☀️ 깨어나기' : '💤 잠자기'}</button>
+            <button key={m} class={s.ctrlBtn({ on: g.speedMode.value === m })} title={title} onClick={() => g.setSpeed(m)}>{icon}</button>)}
+          <button class={s.ctrlBtn()} title="다음 날 09:00까지 스킵" onClick={() => void g.toggleSleep()}>{g.sleeping.value ? '☀️ 깨어나기' : '💤 잠자기'}</button>
         </div>
-        <span class="hud-sp" />
-        <button class="hud-btn" onClick={() => void g.giveUp()}>포기하기</button>
+        <span class={s.spacer} />
+        <button class={s.btn} onClick={() => void g.giveUp()}>포기하기</button>
       </div>
       <Timeline g={g} />
     </>
@@ -105,17 +105,17 @@ function Feed({ g }: { g: CancelGame }) {
     if (el) el.scrollTop = el.scrollHeight;
   }, [items.length]);
   return (
-    <aside class="feed">
-      <div class="feed-head"><b>💬 취켓팅 커뮤니티</b><span>● 실시간</span></div>
-      <ol class="feed-list" ref={list}>
+    <aside class={s.feed}>
+      <div class={s.feedHead}><b>💬 취켓팅 커뮤니티</b><span class={s.live}>● 실시간</span></div>
+      <ol class={s.feedList} ref={list}>
         {items.map((it, i) => (
-          <li key={i} class={cx(it.hint && 'hint')}>
-            <div class="fi-head"><b>{it.user}</b><time>{fmt.mdd(it.t)} {fmt.hm(it.t)}</time></div>
-            <p>{it.hint && '📌 '}{it.text}</p>
+          <li key={i} class={s.feedItem({ hint: it.hint })}>
+            <div class={s.feedMeta}><b class={s.feedUser}>{it.user}</b><time>{fmt.mdd(it.t)} {fmt.hm(it.t)}</time></div>
+            <p class={s.feedText}>{it.hint && '📌 '}{it.text}</p>
           </li>
         ))}
       </ol>
-      <div class="feed-foot">📌 표시된 글은 핫타임 힌트예요</div>
+      <div class={s.feedFoot}>📌 표시된 글은 핫타임 힌트예요</div>
     </aside>
   );
 }

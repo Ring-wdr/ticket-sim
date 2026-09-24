@@ -3,7 +3,9 @@ import { render } from 'preact';
 import { initRouter, navigate } from './app/router';
 import { Session } from './app/session';
 import { createWorkerLink } from './net/workerLink';
-import './styles/style.css';
+// 스타일 순서: 전역 → 공용 조각 → 컴포넌트 (같은 우선순위면 나중 규칙이 이기므로 공용 조각을 먼저 싣는다)
+import './styles/global.css';
+import './ui/shared.css';
 import { App } from './ui/App';
 
 // 기본은 Web Worker. ?server=main 이면 같은 스레드에서 돌린다 (디버거로 서버 코드를 따라갈 때)

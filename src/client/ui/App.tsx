@@ -1,12 +1,12 @@
 // 화면 골격: 게임 상태에서 레이아웃(HUD · 오른쪽 패널 · 팝업 · 들여다보기)을 끌어내 그린다.
-// 레이아웃 치수는 .shell의 모드 클래스가 CSS 변수(--hud-h · --side-w · --side-h)로 정한다.
+// 레이아웃 치수는 shell의 모드 변형이 CSS 변수로 정한다 (styles/theme.css.ts의 layoutVar).
 import { useEffect } from 'preact/hooks';
 import { dialog } from '../app/dialog';
 import { navigate, route } from '../app/router';
 import type { Session } from '../app/session';
 import { BookingWindow } from './BookingWindow';
+import * as s from './App.css';
 import { SessionContext } from './context';
-import { cx } from './cx';
 import { HomePage } from './HomePage';
 import { Hud, Side } from './Hud';
 import { Dialogs, Inspector, Toasts } from './Overlays';
@@ -52,9 +52,9 @@ export function App({ session }: { session: Session }) {
 
   return (
     <SessionContext.Provider value={session}>
-      <div class={cx('shell', g && `in-game mode-${g.kind}`)}>
-        {g && <div class="hud"><Hud g={g} /></div>}
-        <div class={cx('page', g?.kind === 'open' && g.reloading.value && 'reloading')}>{page}</div>
+      <div class={s.shell({ mode: g?.kind ?? 'none' })}>
+        {g && <div class={s.hud}><Hud g={g} /></div>}
+        <div class={s.page({ reloading: g?.kind === 'open' && g.reloading.value })}>{page}</div>
         {g && <Side g={g} />}
         {g?.kind === 'open' && g.queue.value && <QueueWindow g={g} />}
         {flow && <BookingWindow key={flow} flow={flow} />}
