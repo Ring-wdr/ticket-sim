@@ -1,0 +1,12 @@
+{
+  // 브라우저 UI (Preact)
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["esnext", "dom", "dom.iterable"],
+    "jsx": "react-jsx",
+    "jsxImportSource": "preact",
+    "types": ["vite/client"]
+  },
+  "include": ["src/shared", "src/client"],
+  "exclude": ["**/*.test.ts"]
+}

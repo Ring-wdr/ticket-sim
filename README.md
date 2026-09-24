@@ -1,7 +1,10 @@
 # 티키타카 TICKET — 티켓팅 시뮬레이터
 
 `code_artifact.md`(대규모 선착순 예매 시스템 가이드)의 아키텍처를 **브라우저 안의 가상 서버**로 재현한 티켓팅 연습 게임입니다.
-빌드 · 설치 없이 `index.html`을 더블클릭하면 실행됩니다. (폰트만 CDN에서 불러오며, 오프라인이면 시스템 폰트로 대체)
+TypeScript + Preact SPA. 가상 서버는 **Web Worker** 안에서 돌고, UI는 메시지로 받은 스냅샷만 봅니다 (`?server=main`을 붙이면 디버깅용으로 메인 스레드에서 실행).
+바닐라 JS 프로토타입은 커밋 `0d25428`에서 볼 수 있습니다.
+
+**플레이:** https://ring-wdr.github.io/ticket-sim/ (main에 push되면 GitHub Actions가 빌드해 Pages로 배포)
 
 ## 모드
 | 모드 | 내용 |
@@ -17,16 +20,27 @@
 ## md 개념 ↔ 구현
 | md | 파일 |
 |---|---|
-| Redis ZSET / String EX·NX / EVAL | `js/server/miniRedis.js` |
-| 대기열 등록 · 순위 · ZPOPMIN (군중은 도착 분포 곡선으로 모델링) | `js/server/queueService.js` |
-| 원자적 좌석 선점 + 재고 차감 (Lua) | `js/server/bookingEngine.js` |
-| MQ + Worker → RDB | `js/server/mq.js` |
-| 응답 지연 · Rate limit | `js/server/api.js` |
-| 게임 시계 (TTL · 폴링 · 압축 시간선) | `js/core/clock.js` |
-| 입장 스케줄러 · Adaptive Polling + Jitter | `js/modes/modeOpen.js` |
-| 취소표 이벤트 · 핫타임 배속 | `js/modes/modeCancel.js` |
+| Redis ZSET / String EX·NX / EVAL | `src/sim/miniRedis.ts` |
+| 대기열 등록 · 순위 · ZPOPMIN (군중은 도착 분포 곡선으로 모델링) | `src/sim/queueService.ts` |
+| 원자적 좌석 선점 + 재고 차감 (Lua) | `src/sim/bookingEngine.ts` |
+| MQ + Worker → RDB | `src/sim/mq.ts` |
+| Rate limit | `src/sim/rateLimiter.ts` |
+| 게임 시계 (TTL · 폴링 · 압축 시간선) | `src/sim/clock.ts` |
+| 입장 스케줄러 · Adaptive Polling | `src/sim/modes/openServer.ts` |
+| 취소표 이벤트 · 핫타임 배속 | `src/sim/modes/cancelServer.ts` |
 
-## 개발용 로컬 서버 (선택)
+## 개발
 ```bash
-python -m http.server 5173
+npm install
+npm run dev        # http://127.0.0.1:5173
+npm test           # 시뮬레이션 코어 테스트 (Vitest)
+npm run typecheck  # TypeScript 7 — sim / worker / app 프로젝트별 lib로 각각 검사
+npm run lint       # oxlint
 ```
+
+| 폴더 | 역할 |
+|---|---|
+| `src/shared` | 서버·UI 공용 타입과 순수 데이터 (좌석도, 공연 정보, 포맷) |
+| `src/sim` | 가상 서버 시뮬레이션 코어. DOM · 타이머 없이 순수 TS, 시드 고정 재현 |
+| `src/server` | Web Worker 진입점 · GameHost(네트워크 지연 · 시계 동기화 · 로그/들여다보기 전송) |
+| `src/client` | Preact SPA — `app/`(세션 · 라우터 · 대화상자), `game/`(모드별 컨트롤러 · 예매 흐름 스토어), `net/`(서버 연결 · 시계 사본), `ui/`(컴포넌트) |

@@ -5,38 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>티키타카 티켓 · 티켓팅 시뮬레이터</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
-<link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-<div id="hud"></div>
-<div id="app"></div>
-<div id="side"></div>
-<div id="layer"></div>
-<div id="inspector" hidden></div>
-<div id="dialogs"></div>
-<div id="toasts"></div>
-
-<!-- core -->
-<script src="js/core/base.js"></script>
-<script src="js/core/clock.js"></script>
-<!-- 가상 서버 (md의 Redis / Scheduler / Lua / MQ 대응) -->
-<script src="js/server/miniRedis.js"></script>
-<script src="js/server/queueService.js"></script>
-<script src="js/server/bookingEngine.js"></script>
-<script src="js/server/mq.js"></script>
-<script src="js/server/api.js"></script>
-<!-- 시뮬레이션 데이터 -->
-<script src="js/sim/venue.js"></script>
-<!-- UI -->
-<script src="js/ui/dom.js"></script>
-<script src="js/ui/captcha.js"></script>
-<script src="js/ui/seatStep.js"></script>
-<script src="js/ui/bookingFlow.js"></script>
-<script src="js/ui/inspector.js"></script>
-<script src="js/ui/pages.js"></script>
-<!-- 게임 모드 -->
-<script src="js/modes/modeOpen.js"></script>
-<script src="js/modes/modeCancel.js"></script>
-<script src="js/main.js"></script>
+<div id="root"></div>
+<script type="module" src="/src/client/main.tsx"></script>
 </body>
 </html>

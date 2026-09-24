@@ -3,9 +3,22 @@
   "configurations": [
     {
       "name": "ticket-sim",
-      "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "5173", "--bind", "127.0.0.1"],
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
       "port": 5173
+    },
+    {
+      "name": "ticket-sim-preview",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "preview", "--", "--port", "4173", "--host", "127.0.0.1"],
+      "port": 4173
+    },
+    {
+      "name": "ticket-sim-pages",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "preview", "--", "--port", "4174", "--host", "127.0.0.1", "--base", "/ticket-sim/"],
+      "port": 4174,
+      "url": "http://127.0.0.1:4174"
     }
   ]
 }
