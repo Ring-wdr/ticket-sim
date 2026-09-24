@@ -1,3 +1,4 @@
+import type { ReadonlySignal } from '@preact/signals';
 import type {
   Blocked, ConfirmResult, Expired, LockResult, LogLevel, LogSrc, ModeKind, PayMethod, ReleaseResult, SeatView,
 } from '../../shared/model';
@@ -10,6 +11,8 @@ import type { ServerLink } from '../net/link';
 export interface GameContext {
   readonly link: ServerLink;
   readonly clock: GameClock;
+  /** 화면 갱신 주기마다 바뀌는 게임 시각 — 남은 시간 같은 파생 상태가 이걸 따라 다시 계산된다 */
+  readonly now: ReadonlySignal<number>;
   log(src: LogSrc, msg: string, level?: LogLevel): void;
   finish(r: GameResult): void;
 }
@@ -23,11 +26,10 @@ export interface BookingGame {
   readonly seatHint: string | null;
   readonly venue: Venue;
   readonly stats: PlayerStats;
-  persistLagMs: number | null;
+  /** 예매 제한시간까지 남은 ms. 제한이 없으면 null */
+  readonly timeLeft: ReadonlySignal<number | null>;
   dateLabel(): string;
   fmtTime(t: number): string;
-  /** 예매 제한시간까지 남은 ms. 제한이 없으면 null */
-  timeLeft(): number | null;
   seatView(zone: string | null): Promise<SeatView | Blocked | Expired>;
   lock(ids: SeatId[]): Promise<LockResult | Expired>;
   release(ids: SeatId[]): Promise<ReleaseResult>;

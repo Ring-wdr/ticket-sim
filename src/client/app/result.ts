@@ -52,9 +52,11 @@ export type GameResult = OpenResult | CancelResult;
 /** [항목, 값, 보조설명] */
 export type ResultRow = [string, string, string?];
 
-const RANK_BY_GRADE: Record<GradeKey, string> = { VIP: 'S', R: 'A', S: 'B' };
+export type ResultRank = 'S' | 'A' | 'B' | 'F';
 
-export function resultRank(r: GameResult): string {
+const RANK_BY_GRADE: Record<GradeKey, ResultRank> = { VIP: 'S', R: 'A', S: 'B' };
+
+export function resultRank(r: GameResult): ResultRank {
   if (!r.success || !r.seats.length) return 'F';
   const best = GRADE_KEYS.find(g => r.seats.some(s => s.grade === g))!;
   return RANK_BY_GRADE[best];

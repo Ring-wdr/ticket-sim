@@ -3,7 +3,9 @@ import { useEffect, useRef } from 'preact/hooks';
 import type { LogSrc } from '../../shared/model';
 import { fmt } from '../../shared/time';
 import { dialogs, toasts, type DialogReq } from '../app/dialog';
+import type { Game } from '../app/session';
 import { useSession } from './context';
+import * as s from './Overlays.css';
 
 function Dialog({ d, top }: { d: DialogReq; top: boolean }) {
   const primary = useRef<HTMLButtonElement>(null);
@@ -19,12 +21,12 @@ function Dialog({ d, top }: { d: DialogReq; top: boolean }) {
     return () => document.removeEventListener('keydown', onKey, true);
   }, [d, top]);
   return (
-    <div class="dlg-backdrop"><div class="dlg" role="alertdialog">
-      <div class="dlg-origin">tickets.tikitaka.example 내용:</div>
-      <div class="dlg-msg">{d.msg.split('\n').map((line, i) => <span key={i}>{i > 0 && <br />}{line}</span>)}</div>
-      <div class="dlg-actions">
+    <div class={s.dialogBackdrop}><div class={s.dialog} role="alertdialog">
+      <div class={s.dialogOrigin}>tickets.tikitaka.example 내용:</div>
+      <div class={s.dialogMsg}>{d.msg.split('\n').map((line, i) => <span key={i}>{i > 0 && <br />}{line}</span>)}</div>
+      <div class={s.dialogActions}>
         {d.buttons.map(b => (
-          <button key={b.label} ref={b.primary ? primary : undefined} class={`dlg-btn ${b.primary ? 'primary' : ''}`} onClick={() => d.close(b.value)}>{b.label}</button>
+          <button key={b.label} ref={b.primary ? primary : undefined} class={s.dialogBtn({ primary: !!b.primary })} onClick={() => d.close(b.value)}>{b.label}</button>
         ))}
       </div>
     </div></div>
@@ -33,11 +35,11 @@ function Dialog({ d, top }: { d: DialogReq; top: boolean }) {
 
 export function Dialogs() {
   const list = dialogs.value;
-  return <div id="dialogs">{list.map((d, i) => <Dialog key={d.id} d={d} top={i === list.length - 1} />)}</div>;
+  return <>{list.map((d, i) => <Dialog key={d.id} d={d} top={i === list.length - 1} />)}</>;
 }
 
 export function Toasts() {
-  return <div id="toasts">{toasts.value.map(t => <div key={t.id} class={`toast ${t.kind} ${t.out ? 'out' : ''}`}>{t.msg}</div>)}</div>;
+  return <div class={s.toasts}>{toasts.value.map(t => <div key={t.id} class={s.toast({ kind: t.kind, out: t.out })}>{t.msg}</div>)}</div>;
 }
 
 const CHECKLIST: [string, string][] = [
@@ -49,37 +51,39 @@ const CHECKLIST: [string, string][] = [
 ];
 const SRC_LABEL: Record<LogSrc, string> = { system: 'SYS', scheduler: 'SCHED', redis: 'REDIS', lua: 'LUA', mq: 'MQ', api: 'API', cancel: 'CANCEL', bot: 'BOT' };
 
-export function Inspector() {
+export function Inspector({ g }: { g: Game }) {
   const session = useSession();
-  const g = session.game.value;
   const open = session.inspectorOpen.value;
   const snap = session.inspect.value;
   const toggle = (): void => { session.inspectorOpen.value = !open; };
-  const logTime = g?.kind === 'cancel' ? (t: number) => `${fmt.mdd(t)} ${fmt.hms(t)}` : fmt.hmsms;
+  const logTime = g.kind === 'cancel' ? (t: number) => `${fmt.mdd(t)} ${fmt.hms(t)}` : fmt.hmsms;
   return (
-    <div id="inspector" hidden={!g} class={open ? 'open' : ''}>
-      <button class="insp-fab" onClick={toggle}>🛠 서버 들여다보기</button>
-      <div class="insp-panel">
-        <div class="insp-head"><div><b>🛠 서버 들여다보기</b><span>{session.link.where === 'worker' ? 'Web Worker 안에서' : '메인 스레드에서'} 돌아가는 가상 서버</span></div><button title="닫기" onClick={toggle}>✕</button></div>
+    <>
+      {!open && <button class={s.fab} onClick={toggle}>🛠 서버 들여다보기</button>}
+      <div class={s.panel({ open })}>
+        <div class={s.head}><div><b class={s.headTitle}>🛠 서버 들여다보기</b><span class={s.headSub}>{session.link.where === 'worker' ? 'Web Worker 안에서' : '메인 스레드에서'} 돌아가는 가상 서버</span></div><button class={s.close} title="닫기" onClick={toggle}>✕</button></div>
         {open && (
-          <div class="insp-body">
-            <div class="insp-stats">{snap && <>
-              <h5>Redis 키</h5>
-              <table class="insp-tbl"><tbody>{snap.keys.map(([k, type, val, note]) => (
-                <tr key={k}><td><code>{k}</code><small>{type}</small></td><td><b>{val}</b>{note && <small>{note}</small>}</td></tr>
+          <div class={s.body}>
+            {snap && <>
+              <h5 class={s.section}>Redis 키</h5>
+              <table class={s.keys}><tbody>{snap.keys.map(([k, type, val, note]) => (
+                <tr key={k}>
+                  <td class={s.keyCell}><code class={s.keyName}>{k}</code><small class={s.keyNote}>{type}</small></td>
+                  <td class={s.keyCell}><b class={s.keyVal}>{val}</b>{note && <small class={s.keyNote}>{note}</small>}</td>
+                </tr>
               ))}</tbody></table>
-              <h5>지표</h5>
-              <div class="insp-metrics">{snap.metrics.map(([k, v]) => <div key={k}><span>{k}</span><b>{v}</b></div>)}</div>
-            </>}</div>
-            <h5>이벤트 로그</h5>
-            <ol class="insp-logs">{session.logs.value.slice(-80).reverse().map((l, i) => (
-              <li key={`${l.t}-${i}`} class={`lv-${l.level}`}><time>{logTime(l.t)}</time><em class={`src-${l.src}`}>{SRC_LABEL[l.src]}</em><span>{l.msg}</span></li>
+              <h5 class={s.section}>지표</h5>
+              <div class={s.metrics}>{snap.metrics.map(([k, v]) => <div key={k} class={s.metric}><span class={s.metricName}>{k}</span><b class={s.keyVal}>{v}</b></div>)}</div>
+            </>}
+            <h5 class={s.section}>이벤트 로그</h5>
+            <ol class={s.logs}>{session.logs.value.slice(-80).reverse().map((l, i) => (
+              <li key={`${l.t}-${i}`} class={s.log}><time class={s.logTime}>{logTime(l.t)}</time><em class={s.logSrc({ src: l.src })}>{SRC_LABEL[l.src]}</em><span class={s.logMsg({ level: l.level })}>{l.msg}</span></li>
             ))}</ol>
-            <h5>md 체크리스트 대응</h5>
-            <ul class="insp-check">{CHECKLIST.map(([t, d]) => <li key={t}><b>✅ {t}</b><span>{d}</span></li>)}</ul>
+            <h5 class={s.section}>md 체크리스트 대응</h5>
+            <ul class={s.checklist}>{CHECKLIST.map(([t, d]) => <li key={t} class={s.checkItem}><b class={s.checkTitle}>✅ {t}</b><span class={s.checkDesc}>{d}</span></li>)}</ul>
           </div>
         )}
       </div>
-    </div>
+    </>
   );
 }

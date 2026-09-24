@@ -1,5 +1,5 @@
 // 예매창 단계 흐름: 좌석 선택 → 가격/할인 → 배송/예매확인 → 결제 → 완료
-import { signal } from '@preact/signals';
+import { computed, effect, signal, untracked } from '@preact/signals';
 import type { PayMethod, Persisted } from '../../shared/model';
 import { GRADES, seatOf, type Seat, type SeatId } from '../../shared/venue';
 import { dialog } from '../app/dialog';
@@ -10,6 +10,7 @@ export const STEPS = ['관람일/회차', '좌석 선택', '가격/할인', '배
 /** 2~5: STEPS의 번호, 6: 완료 */
 export type FlowStep = 2 | 3 | 4 | 5 | 6;
 export const FEE = 2000;
+export type Receive = 'mobile' | 'onsite';
 
 export class BookingFlow {
   readonly step = signal<FlowStep>(2);
@@ -21,26 +22,32 @@ export class BookingFlow {
   readonly persistLag = signal<number | null>(null);
   readonly paying = signal(false);
   readonly payMethod = signal<PayMethod>('card');
+  readonly receive = signal<Receive>('mobile');
   readonly agreeInfo = signal(false);
   readonly agreeAll = signal(false);
-  private timedOut = false;
+  /** 제한시간이 다 됐는지. 값이 바뀔 때만 알리므로 만료 → 재선점 → 만료도 매번 한 번씩 잡힌다 */
+  private readonly expired = computed(() => {
+    const ms = this.game.timeLeft.value;
+    return ms != null && ms <= 0;
+  });
+  private stopTimer: (() => void) | null = null;
   private closed = false;
   /** 결제 응답보다 먼저 도착한 저장 완료 알림 (푸시가 응답보다 빠를 수 있다) */
   private readonly early = new Map<string, Persisted>();
 
   constructor(readonly game: BookingGame) {}
 
-  open({ captcha = true } = {}): void { this.gotoSeat(captcha); }
-  close(): void { this.closed = true; }
-  get isClosed(): boolean { return this.closed; }
+  open({ captcha = true } = {}): void {
+    this.stopTimer ??= effect(() => {
+      if (this.expired.value) untracked(() => this.game.onTimeout());
+    });
+    this.gotoSeat(captcha);
+  }
 
-  /** 게임 프레임마다: 제한시간이 지났으면 게임에 알린다 */
-  checkTimer(): void {
-    const ms = this.game.timeLeft();
-    if (ms != null && ms <= 0 && !this.timedOut) {
-      this.timedOut = true;
-      this.game.onTimeout();
-    }
+  close(): void {
+    this.closed = true;
+    this.stopTimer?.();
+    this.stopTimer = null;
   }
 
   // ---------- 02 좌석 선택 ----------
@@ -49,7 +56,6 @@ export class BookingFlow {
     this.locked.value = null;
     const picker = new SeatPicker(this.game, ids => {
       this.locked.value = ids;
-      this.timedOut = false;
       this.gotoPrice();
     });
     this.picker.value = picker;
@@ -123,9 +129,7 @@ export class BookingFlow {
       if (this.bookingNo.value == null) this.early.set(row.bookingNo, row);
       return;
     }
-    const lag = row.savedAt - row.publishedAt;
-    this.persistLag.value = lag;
-    this.game.persistLagMs = lag;
+    this.persistLag.value = row.savedAt - row.publishedAt;
   }
 
   async askClose(): Promise<void> {

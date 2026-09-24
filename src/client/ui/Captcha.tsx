@@ -1,5 +1,7 @@
 // 안심예매 보안문자 (게임 내 연출용 캡차)
 import { useEffect, useRef, useState } from 'preact/hooks';
+import * as s from './Captcha.css';
+import { btn } from './shared.css';
 
 const CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
 
@@ -61,17 +63,17 @@ export function Captcha({ onPass, onFail }: { onPass: () => void; onFail: () => 
   };
 
   return (
-    <div class="cap-overlay">
+    <div class={s.overlay}>
       {/* key를 바꿔 흔들림 애니메이션을 다시 재생한다 */}
-      <div class={`cap-box ${shake ? 'shake' : ''}`} key={shake}>
-        <div class="cap-title"><span class="cap-shield">🛡</span><b>안심예매</b> 보안문자 입력</div>
-        <p class="cap-desc">부정 예매 방지를 위해 아래 문자를 입력해 주세요.<br />인증 후 좌석을 선택할 수 있습니다.</p>
-        <div class="cap-img"><canvas ref={canvas} width={230} height={66} /><button class="cap-re" type="button" title="새로운 문자" onClick={regen}>↻</button></div>
-        <input ref={field} class="cap-input" maxLength={6} placeholder="대소문자 구분 없이 입력" autoComplete="off" spellcheck={false}
+      <div class={s.box({ shake: shake > 0 })} key={shake}>
+        <div class={s.title}><span>🛡</span><b class={s.brand}>안심예매</b> 보안문자 입력</div>
+        <p class={s.desc}>부정 예매 방지를 위해 아래 문자를 입력해 주세요.<br />인증 후 좌석을 선택할 수 있습니다.</p>
+        <div class={s.image}><canvas class={s.canvas} ref={canvas} width={230} height={66} /><button class={s.regen} type="button" title="새로운 문자" onClick={regen}>↻</button></div>
+        <input ref={field} class={s.input} maxLength={6} placeholder="대소문자 구분 없이 입력" autoComplete="off" spellcheck={false}
           value={input} onInput={e => setInput(e.currentTarget.value)}
           onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); submit(); } }} />
-        <div class="cap-err">{err}</div>
-        <button class="btn-primary btn-block cap-ok" type="button" onClick={submit}>입력완료</button>
+        <div class={s.error}>{err}</div>
+        <button class={btn({ block: true })} type="button" onClick={submit}>입력완료</button>
       </div>
     </div>
   );
