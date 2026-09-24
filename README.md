@@ -44,3 +44,7 @@ npm run lint       # oxlint
 | `src/sim` | 가상 서버 시뮬레이션 코어. DOM · 타이머 없이 순수 TS, 시드 고정 재현 |
 | `src/server` | Web Worker 진입점 · GameHost(네트워크 지연 · 시계 동기화 · 로그/들여다보기 전송) |
 | `src/client` | Preact SPA — `app/`(세션 · 라우터 · 대화상자), `game/`(모드별 컨트롤러 · 예매 흐름 스토어), `net/`(서버 연결 · 시계 사본), `ui/`(컴포넌트) |
+
+스타일은 [vanilla-extract](https://vanilla-extract.style/)로 컴포넌트 옆 `X.css.ts`에 둡니다 (빌드 때 정적 CSS로 뽑혀 런타임 비용 없음).
+디자인 토큰 · 레이아웃 변수 · 반응형 구간은 `src/client/styles/theme.css.ts`, 여러 화면이 같이 쓰는 버튼 · 표 등은 `src/client/ui/shared.css.ts`.
+상태에 따라 바뀌는 모양은 recipe 변형(`seat({ on, sel })`)으로, 요소마다 다른 색은 `assignInlineVars`로 넘깁니다.
