@@ -4,6 +4,8 @@
 TypeScript + Preact SPA. 가상 서버는 **Web Worker** 안에서 돌고, UI는 메시지로 받은 스냅샷만 봅니다 (`?server=main`을 붙이면 디버깅용으로 메인 스레드에서 실행).
 바닐라 JS 프로토타입은 커밋 `0d25428`에서 볼 수 있습니다.
 
+**플레이:** https://ring-wdr.github.io/ticket-sim/ (main에 push되면 GitHub Actions가 빌드해 Pages로 배포)
+
 ## 모드
 | 모드 | 내용 |
 |---|---|
