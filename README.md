@@ -2,7 +2,7 @@
 
 `code_artifact.md`(대규모 선착순 예매 시스템 가이드)의 아키텍처를 **브라우저 안의 가상 서버**로 재현한 티켓팅 연습 게임입니다.
 TypeScript + Preact SPA. 가상 서버는 **Web Worker** 안에서 돌고, UI는 메시지로 받은 스냅샷만 봅니다 (`?server=main`을 붙이면 디버깅용으로 메인 스레드에서 실행).
-바닐라 JS 프로토타입은 `prototype/`에 참고용으로 남아 있습니다.
+바닐라 JS 프로토타입은 커밋 `0d25428`에서 볼 수 있습니다.
 
 ## 모드
 | 모드 | 내용 |
@@ -30,7 +30,7 @@ TypeScript + Preact SPA. 가상 서버는 **Web Worker** 안에서 돌고, UI는
 ## 개발
 ```bash
 npm install
-npm run dev        # http://127.0.0.1:5173  (프로토타입: /prototype/index.html)
+npm run dev        # http://127.0.0.1:5173
 npm test           # 시뮬레이션 코어 테스트 (Vitest)
 npm run typecheck  # TypeScript 7 — sim / worker / app 프로젝트별 lib로 각각 검사
 npm run lint       # oxlint
@@ -42,4 +42,3 @@ npm run lint       # oxlint
 | `src/sim` | 가상 서버 시뮬레이션 코어. DOM · 타이머 없이 순수 TS, 시드 고정 재현 |
 | `src/server` | Web Worker 진입점 · GameHost(네트워크 지연 · 시계 동기화 · 로그/들여다보기 전송) |
 | `src/client` | Preact SPA — `app/`(세션 · 라우터 · 대화상자), `game/`(모드별 컨트롤러 · 예매 흐름 스토어), `net/`(서버 연결 · 시계 사본), `ui/`(컴포넌트) |
-| `prototype/` | 이전 전 바닐라 JS 버전 (참고용) |
