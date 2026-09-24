@@ -182,7 +182,10 @@ export class OpenServer {
 
   /** Adaptive Polling (md 4.1): 대기 예상 시간에 따라 다음 폴링 주기를 내려준다 */
   queueStatus(uuid: string): QueueStatus {
-    if (this.redis.has(ACTIVE + uuid)) return { status: 'ACTIVE', ttl: this.redis.ttl(ACTIVE + uuid) };
+    if (this.redis.has(ACTIVE + uuid)) {
+      const soldPct = 1 - this.engine.stockTotal() / this.venue.seats.length;
+      return { status: 'ACTIVE', ttl: this.redis.ttl(ACTIVE + uuid), soldPct };
+    }
     const rank = this.queue.rank(uuid);
     if (rank == null) return { status: 'GONE' };
     const est = rank / this.D.batch;

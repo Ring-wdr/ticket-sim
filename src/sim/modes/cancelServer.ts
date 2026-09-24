@@ -284,6 +284,8 @@ export class CancelServer {
       focus: this.focus,
       sleepUntil: this.sleepUntil,
       lockUntil: lockId && !this.booked ? this.clock.now + this.redis.pttl('seat:lock:' + lockId) : null,
+      releases: this.stats.releases,
+      botTakes: this.stats.botTakes,
     };
   }
 

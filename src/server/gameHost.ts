@@ -156,8 +156,8 @@ export class GameHost {
     this.sendTick();
     this.flushLogs();
     return g instanceof OpenServer
-      ? { mode: 'open', diff: o.diff, label: g.D.label, now: g.clock.now, openAt: OPEN_AT, activeTtl: g.D.activeTtl }
-      : { mode: 'cancel', diff: o.diff, label: g.D.label, now: g.clock.now, start: CANCEL_START, end: CANCEL_END, windows: [...g.revealed] };
+      ? { mode: 'open', game: this.gen, diff: o.diff, label: g.D.label, now: g.clock.now, openAt: OPEN_AT, activeTtl: g.D.activeTtl, batch: g.D.batch }
+      : { mode: 'cancel', game: this.gen, diff: o.diff, label: g.D.label, now: g.clock.now, start: CANCEL_START, end: CANCEL_END, windows: [...g.revealed] };
   }
 
   private stop(): void {
@@ -211,7 +211,7 @@ export class GameHost {
     this.emit({ t: 'logs', entries });
   }
 
-  private emit(evt: ServerEvent): void { this.post({ kind: 'evt', evt }); }
+  private emit(evt: ServerEvent): void { this.post({ kind: 'evt', game: this.gen, evt }); }
 
   private reply(id: number, fn: () => unknown): void {
     try {

@@ -38,7 +38,8 @@ export type QueueEnterResult =
   | { uuid: string; arrivedAt: number; rank: number };
 
 export type QueueStatus =
-  | { status: 'ACTIVE'; ttl: number }
+  /** soldPct: 입장 시점 판매율 (0~1) */
+  | { status: 'ACTIVE'; ttl: number; soldPct: number }
   | { status: 'GONE' }
   | { status: 'WAITING'; rank: number; behind: number; est: number; next_poll_ttl: number };
 
@@ -77,4 +78,7 @@ export interface CancelStatus {
   sleepUntil: number | null;
   /** 내 좌석 락 만료 시각 (없으면 null) */
   lockUntil: number | null;
+  /** 지금까지 풀린 취소표 / 다른 취켓러가 가져간 표 */
+  releases: number;
+  botTakes: number;
 }

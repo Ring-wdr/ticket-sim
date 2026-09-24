@@ -7,7 +7,8 @@ export class ServerError extends Error {}
 
 export interface ServerLink {
   call<M extends Method>(method: M, params: Params<M>): Promise<Result<M>>;
-  on(fn: (e: ServerEvent) => void): () => void;
+  /** game: 이벤트를 만든 게임 번호 (GameInfo.game) */
+  on(fn: (e: ServerEvent, game: number) => void): () => void;
   dispose(): void;
 }
 
@@ -21,11 +22,11 @@ export interface Transport {
 export function createLink(t: Transport): ServerLink {
   let seq = 0;
   const pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
-  const listeners = new Set<(e: ServerEvent) => void>();
+  const listeners = new Set<(e: ServerEvent, game: number) => void>();
 
   t.listen(m => {
     if (m.kind === 'evt') {
-      for (const fn of listeners) fn(m.evt);
+      for (const fn of listeners) fn(m.evt, m.game);
       return;
     }
     const p = pending.get(m.id);

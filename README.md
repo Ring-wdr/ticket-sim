@@ -1,7 +1,7 @@
 # 티키타카 TICKET — 티켓팅 시뮬레이터
 
 `code_artifact.md`(대규모 선착순 예매 시스템 가이드)의 아키텍처를 **브라우저 안의 가상 서버**로 재현한 티켓팅 연습 게임입니다.
-> **TypeScript + SPA(Preact)로 이전 중입니다.** 가상 서버 코어는 `src/sim`으로 옮겨졌고, UI 이전 전까지는 `prototype/`의 기존 버전으로 플레이합니다.
+> **TypeScript + SPA(Preact)로 이전 중입니다.** 가상 서버(`src/sim`)와 UI(`src/client`)는 옮겨졌고, 남은 단계는 가상 서버를 Web Worker로 분리하는 것입니다. 기존 버전은 `prototype/`에 참고용으로 남아 있습니다.
 
 ## 모드
 | 모드 | 내용 |
@@ -40,5 +40,5 @@ npm run lint       # oxlint
 | `src/shared` | 서버·UI 공용 타입과 순수 데이터 (좌석도, 공연 정보, 포맷) |
 | `src/sim` | 가상 서버 시뮬레이션 코어. DOM · 타이머 없이 순수 TS, 시드 고정 재현 |
 | `src/server` | Web Worker에서 시뮬레이션을 실제 시간으로 구동 |
-| `src/client` | Preact SPA |
+| `src/client` | Preact SPA — `app/`(세션 · 라우터 · 대화상자), `game/`(모드별 컨트롤러 · 예매 흐름 스토어), `net/`(서버 연결 · 시계 사본), `ui/`(컴포넌트) |
 | `prototype/` | 이전 전 바닐라 JS 버전 (참고용) |

@@ -9,10 +9,11 @@ import type { SeatId } from './venue';
 
 export interface StartOptions { mode: 'open' | 'cancel'; diff: DiffKey; seed: number }
 
+/** game: 호스트의 게임 번호. 이벤트에도 붙어 와서 이전 게임의 늦은 이벤트를 걸러 낸다 */
 export type GameInfo =
-  | { mode: 'open'; diff: DiffKey; label: string; now: number; openAt: number; activeTtl: number }
+  | { mode: 'open'; game: number; diff: DiffKey; label: string; now: number; openAt: number; activeTtl: number; batch: number }
   | {
-      mode: 'cancel'; diff: DiffKey; label: string; now: number; start: number; end: number;
+      mode: 'cancel'; game: number; diff: DiffKey; label: string; now: number; start: number; end: number;
       /** 처음부터 공개된 핫타임 (나머지는 feed 이벤트의 reveal로 알려진다) */
       windows: HotWindow[];
     };
@@ -83,4 +84,4 @@ export type ClientMsg = { kind: 'req'; id: number; method: Method; params: unkno
 export type ServerMsg =
   | { kind: 'res'; id: number; ok: true; result: unknown }
   | { kind: 'res'; id: number; ok: false; error: string }
-  | { kind: 'evt'; evt: ServerEvent };
+  | { kind: 'evt'; game: number; evt: ServerEvent };

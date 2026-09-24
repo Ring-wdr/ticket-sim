@@ -1,15 +1,27 @@
-// SPA 진입점. UI 이전(4단계) 전까지는 안내 화면만 보여 준다.
+// SPA 진입점: 가상 서버 연결 · 라우터 · 게임 내 F5 · 탭 숨김 시 일시정지
 import { render } from 'preact';
-import '../../prototype/css/style.css';
+import { dialog } from './app/dialog';
+import { initRouter, navigate } from './app/router';
+import { Session } from './app/session';
+import { createInProcessLink } from './net/inProcessLink';
+import './styles/style.css';
+import { App } from './ui/App';
 
-function Placeholder() {
-  return (
-    <main style={{ maxWidth: 640, margin: '80px auto', padding: '0 16px', lineHeight: 1.6 }}>
-      <h1>티키타카 TICKET · TypeScript 이전 중</h1>
-      <p>가상 서버 코어(<code>src/sim</code>)는 TypeScript로 옮겨졌고 테스트로 검증됩니다. UI는 아직 이전 전입니다.</p>
-      <p><a href="/prototype/index.html">▶ 기존 프로토타입으로 플레이하기</a></p>
-    </main>
-  );
-}
+const link = createInProcessLink();
+const session = new Session(link, navigate);
+initRouter();
 
-render(<Placeholder />, document.getElementById('root')!);
+// F5 / Ctrl+R 은 게임 안의 "새로고침"으로 해석한다 (대기 중이면 순번 초기화!)
+document.addEventListener('keydown', e => {
+  const isReload = e.key === 'F5' || ((e.ctrlKey || e.metaKey) && (e.key === 'r' || e.key === 'R'));
+  const g = session.game.value;
+  if (!isReload || !g) return;
+  e.preventDefault();
+  if (dialog.isOpen()) return;
+  g.onF5();
+});
+
+// 탭이 가려지면 게임 시간을 멈춘다
+document.addEventListener('visibilitychange', () => session.setPaused(document.hidden));
+
+render(<App session={session} />, document.getElementById('root')!);
