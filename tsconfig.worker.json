@@ -1,0 +1,7 @@
+{
+  // 가상 서버 Worker
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": { "lib": ["esnext", "webworker"] },
+  "include": ["src/shared", "src/sim", "src/server"],
+  "exclude": ["**/*.test.ts"]
+}

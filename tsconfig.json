@@ -1,0 +1,10 @@
+{
+  // 에디터용 루트. 타입 검사는 npm run typecheck (프로젝트별 lib가 다름)
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.sim.json" },
+    { "path": "./tsconfig.worker.json" },
+    { "path": "./tsconfig.app.json" },
+    { "path": "./tsconfig.test.json" }
+  ]
+}

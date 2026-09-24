@@ -1,0 +1,7 @@
+{
+  // 순수 시뮬레이션 코어: DOM · Worker API 없이 타입 검사 (테스트 포함)
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": { "lib": ["esnext"] },
+  "include": ["src/shared", "src/sim"],
+  "exclude": ["src/shared/wall.ts"]
+}
