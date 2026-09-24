@@ -21,5 +21,5 @@ export function createInProcessLink(opts?: HostOptions): ServerLink {
       host.handle({ kind: 'req', id: 0, method: 'game.stop', params: null });
       closed = true;
     },
-  });
+  }, 'main');
 }

@@ -60,7 +60,7 @@ export function Inspector() {
     <div id="inspector" hidden={!g} class={open ? 'open' : ''}>
       <button class="insp-fab" onClick={toggle}>🛠 서버 들여다보기</button>
       <div class="insp-panel">
-        <div class="insp-head"><div><b>🛠 서버 들여다보기</b><span>브라우저 안에서 돌아가는 가상 서버</span></div><button title="닫기" onClick={toggle}>✕</button></div>
+        <div class="insp-head"><div><b>🛠 서버 들여다보기</b><span>{session.link.where === 'worker' ? 'Web Worker 안에서' : '메인 스레드에서'} 돌아가는 가상 서버</span></div><button title="닫기" onClick={toggle}>✕</button></div>
         {open && (
           <div class="insp-body">
             <div class="insp-stats">{snap && <>

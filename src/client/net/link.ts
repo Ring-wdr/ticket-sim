@@ -5,7 +5,11 @@ import type { ClientMsg, Method, Params, Result, ServerEvent, ServerMsg } from '
 
 export class ServerError extends Error {}
 
+export type ServerWhere = 'worker' | 'main';
+
 export interface ServerLink {
+  /** 가상 서버가 도는 곳 (들여다보기 패널 표시용) */
+  readonly where: ServerWhere;
   call<M extends Method>(method: M, params: Params<M>): Promise<Result<M>>;
   /** game: 이벤트를 만든 게임 번호 (GameInfo.game) */
   on(fn: (e: ServerEvent, game: number) => void): () => void;
@@ -19,7 +23,7 @@ export interface Transport {
   close(): void;
 }
 
-export function createLink(t: Transport): ServerLink {
+export function createLink(t: Transport, where: ServerWhere): ServerLink {
   let seq = 0;
   const pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
   const listeners = new Set<(e: ServerEvent, game: number) => void>();
@@ -36,6 +40,7 @@ export function createLink(t: Transport): ServerLink {
   });
 
   return {
+    where,
     call<M extends Method>(method: M, params: Params<M>): Promise<Result<M>> {
       const id = ++seq;
       return new Promise<Result<M>>((resolve, reject) => {
